@@ -1,0 +1,17 @@
+__default__:
+    queue : "short"
+    time : 60 
+    n : 1
+    mem : 2000
+    name : "{rule}.{wildcards}"
+    log : "logs/cluster/{rule}.{wildcards}.log"
+    err : "logs/cluster/{rule}.{wildcards}.err"
+
+trim_and_demultiplex:
+    time: 120
+    mem : 8000
+
+fastqc:
+    time: 30
+    n : 2
+    mem : 4000
