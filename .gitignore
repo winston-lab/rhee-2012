@@ -3,7 +3,7 @@ annotations/
 alignment/
 qual_ctrl/
 coverage/
-fastq/*
+csfasta/*
 logs/*
 logs/cluster/*
 datavis/

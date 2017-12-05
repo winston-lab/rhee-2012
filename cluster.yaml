@@ -16,12 +16,32 @@ fastqc:
     n : 2
     mem : 4000
 
+csfastq_to_csfasta:
+    time: 20
+    mem : 2000
+
 align:
     time: 180
     n : 4
     mem : 8000
 
-gzip_loose_fastq:
+gzip_loose_files:
     time: 20
     n : 2
     mem : 4000
+
+get_coverage:
+    time: 30
+    mem: 2000 
+
+normalize:
+    time : 30
+    mem: 2000
+
+make_stranded_bedgraph:
+    time : 15
+    mem: 2000
+
+bg_to_bw:
+    time : 15
+    mem: 2000
