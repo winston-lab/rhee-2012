@@ -16,9 +16,10 @@ rule all:
         expand("csfasta/{sample}.csfasta.gz", sample=list(SAMPLES.keys())+["unknown"]),
         expand("alignment/{sample}.bam", sample=list(SAMPLES.keys())+["unknown"]),
         expand("coverage/{norm}/{sample}-chipexo-{norm}-{strand}.{fmt}", norm=["counts","libsizenorm"], strand=["plus", "minus", "SENSE", "ANTISENSE"], sample=list(SAMPLES.keys())+["unknown"], fmt=["bedgraph", "bw"]),
-        # expand("datavis/{annotation}/{annotation}-{sample}-libsizenorm-{strand}.tsv", annotation=config["annotations"], sample=list(SAMPLES.keys())+list(NEXUS_SAMPLES.keys()), strand=["SENSE", "ANTISENSE"]),
         expand("datavis/{annotation}/allsamples-{annotation}-libsizenorm-{strand}.tsv.gz", annotation=config["annotations"], strand=["SENSE", "ANTISENSE"]),
-        expand("datavis/{annotation}/{annotation}-libsizenorm-exo-v-nexus-metagene.svg", annotation=config["annotations"])
+        expand("datavis/{annotation}/{annotation}-libsizenorm-exo-v-nexus-metagene.svg", annotation=config["annotations"]),
+        expand("correlations/union-bedgraph-window-{windowsize}-tfiibsamples.tsv.gz", windowsize=config["corr-windowsizes"]),
+        expand("correlations/tfiib-nexus-v-exo-window-{windowsize}-correlations.svg", windowsize=config["corr-windowsizes"])
 
 rule make_barcode_fasta:
     output:
@@ -172,6 +173,38 @@ rule make_stranded_genome:
     shell: """
         (awk 'BEGIN{{FS=OFS="\t"}}{{print $1"-plus", $2}}{{print $1"-minus", $2}}' {input.exp} > {output.exp}) &> {log}
         """
+
+rule map_to_windows:
+    input:
+        bg = lambda wildcards: config["nexus_coverage_path"] + "../" + wildcards.sample + "-tfiib-chipnexus-libsizenorm-SENSE.bedgraph" if wildcards.sample in NEXUS_SAMPLES else "coverage/libsizenorm/" + wildcards.sample + "-chipexo-libsizenorm-SENSE.bedgraph",
+        chrsizes = os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
+    output:
+        exp = temp("coverage/{sample}-window-{windowsize}-coverage.bedgraph"),
+    shell: """
+        bedtools makewindows -g {input.chrsizes} -w {wildcards.windowsize} | LC_COLLATE=C sort -k1,1 -k2,2n | bedtools map -a stdin -b {input.bg} -c 4 -o sum > {output.exp}
+        """
+
+rule join_tfiib_window_counts:
+    input:
+        coverage = expand("coverage/{sample}-window-{{windowsize}}-coverage.bedgraph", sample=[k for k,v in NEXUS_SAMPLES.items() if v["factor"]=="TFIIB"] + [k for k,v in SAMPLES.items() if v["factor"]=="TFIIB"])
+    params:
+        names = [v[1]["method"]+"-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]=="TFIIB"] + [v[1]["method"]+"-"+str(idx+1) for idx,v in enumerate(SAMPLES.items()) if v[1]["factor"]=="TFIIB"]
+    output:
+        "correlations/union-bedgraph-window-{windowsize}-tfiibsamples.tsv.gz"
+    shell: """
+        bedtools unionbedg -i {input.coverage} -header -names {params.names} | bash scripts/cleanUnionbedg.sh | pigz > {output}
+        """
+
+rule plotcorrelations:
+    input:
+        "correlations/union-bedgraph-window-{windowsize}-tfiibsamples.tsv.gz"
+    output:
+        "correlations/tfiib-nexus-v-exo-window-{windowsize}-correlations.svg"
+    params:
+        pcount = 0.1,
+        samplelist = [v[1]["method"]+"-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]=="TFIIB"] + [v[1]["method"]+"-"+str(idx+1) for idx,v in enumerate(SAMPLES.items()) if v[1]["factor"]=="TFIIB"]
+    script:
+        "scripts/plotcorr.R"
 
 rule bg_to_bw:
     input:

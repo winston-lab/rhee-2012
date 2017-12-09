@@ -45,3 +45,15 @@ make_stranded_bedgraph:
 bg_to_bw:
     time : 15
     mem: 2000
+
+map_to_windows:
+    time : 20
+    mem: 4000
+
+join_tfiib_window_counts:
+    time: 20
+    mem: 4000
+
+plotcorrelations:
+    time : 20
+    mem: 10000
