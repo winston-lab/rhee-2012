@@ -236,8 +236,8 @@ rule deeptools_matrix:
         matrix = temp("datavis/{annotation}/{annotation}-{sample}-libsizenorm-{strand}.tsv")
     params:
         refpoint = lambda wildcards: config["annotations"][wildcards.annotation]["refpoint"],
-        upstream = lambda wildcards: config["annotations"][wildcards.annotation]["upstream"],
-        dnstream = lambda wildcards: config["annotations"][wildcards.annotation]["dnstream"],
+        upstream = lambda wildcards: config["annotations"][wildcards.annotation]["upstream"] + config["annotations"][wildcards.annotation]["binsize"],
+        dnstream = lambda wildcards: config["annotations"][wildcards.annotation]["dnstream"] + config["annotations"][wildcards.annotation]["binsize"],
         binsize = lambda wildcards: config["annotations"][wildcards.annotation]["binsize"],
         sort = lambda wildcards: config["annotations"][wildcards.annotation]["sort"],
         sortusing = lambda wildcards: config["annotations"][wildcards.annotation]["sortby"],
@@ -265,6 +265,7 @@ rule melt_matrix:
     output:
         temp("datavis/{annotation}/{annotation}-{sample}-libsizenorm-{strand}-melted.tsv.gz")
     params:
+        refpoint = lambda wildcards: config["annotations"][wildcards.annotation]["refpoint"],
         group = lambda wildcards : SAMPLES[wildcards.sample]["factor"] if wildcards.sample in SAMPLES else NEXUS_SAMPLES[wildcards.sample]["factor"],
         assay = lambda wildcards: "ChIP-exo" if wildcards.sample in SAMPLES else "ChIP-nexus",
         binsize = lambda wildcards : config["annotations"][wildcards.annotation]["binsize"],

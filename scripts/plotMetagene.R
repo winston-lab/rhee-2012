@@ -38,15 +38,14 @@ plotmeta = function(intable.plus, intable.minus, trim_pct, upstream, downstream,
                              fill="grey65")
     }
     metagene = metagene +
-                geom_ribbon(aes(ymax=pos.mean, ymin=0), fill="#08306b", alpha=.90) +
-                geom_ribbon(aes(ymin=neg.mean, ymax=0), fill="#2171b5", alpha=.90) +
-                #theme_bw() +
-                theme_minimal() +
+                geom_col(aes(y=pos.mean, ymin=0), fill="#08306b", alpha=.90) +
+                geom_col(aes(y=neg.mean, ymax=0), fill="#2171b5", alpha=.90) +
+                theme_light() +
                 scale_x_continuous(breaks = c(-upstream/1000, 0, downstream/1000),
                                    labels=c(upstream, refptlabel, downstream),
                                    name=paste("distance from", refptlabel, "(nt)")) +
                 scale_y_continuous(expand=c(0,0),
-                                   name=paste("trimmed mean of", factors,
+                                   name=paste("mean", factors,
                                               "coverage,\n over", nindices, ylabel)) +
                 theme(strip.text = element_text(size=12, face="bold"),
                       strip.background = element_blank(),
