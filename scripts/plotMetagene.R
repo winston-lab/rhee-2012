@@ -13,6 +13,30 @@ import = function(path){
     return()
 }
 
+format_xaxis_kb = function(refptlabel){
+    function(x) if_else(x==0, refptlabel, as.character(x))
+}
+format_xaxis_nt = function(refptlabel){
+    function(x) if_else(x==0, refptlabel, as.character(x*1000))
+}
+label_xaxis = function(ggp, refptlabel, upstream, downstream){
+    if(upstream>500 | downstream>500){
+        ggp = ggp +
+            scale_x_continuous(breaks=scales::pretty_breaks(n=3),
+                               labels=format_xaxis_kb(refptlabel=refptlabel),
+                               name=paste("distance from", refptlabel, "(kb)"),
+                               limits = c(-upstream/1000, downstream/1000),
+                               expand=c(0,0))
+    } else{
+        ggp = ggp +
+            scale_x_continuous(breaks=scales::pretty_breaks(n=3),
+                               labels=format_xaxis_nt(refptlabel=refptlabel),
+                               name=paste("distance from", refptlabel, "(kb)"),
+                               limits = c(-upstream/1000, downstream/1000),
+                               expand=c(0,0))
+    }
+}
+
 plotmeta = function(intable.plus, intable.minus, trim_pct, upstream, downstream,
                     refptlabel, factors, ylabel, outpath){
     raw = intable.plus %>% import() %>%
@@ -24,7 +48,7 @@ plotmeta = function(intable.plus, intable.minus, trim_pct, upstream, downstream,
     raw$factor = fct_inorder(raw$factor, ordered = TRUE)
     nindices = max(raw$index, na.rm=TRUE)
     
-    df = raw %>% group_by(factor, assay, sample, position) %>%
+    df = raw %>% group_by(factor, assay, position) %>%
             summarise(pos.mean = winsor.mean(cpm.x, trim=trim_pct, na.rm=TRUE),
                       neg.mean = winsor.mean(cpm.y, trim=trim_pct, na.rm=TRUE))
     
@@ -38,27 +62,27 @@ plotmeta = function(intable.plus, intable.minus, trim_pct, upstream, downstream,
                              fill="grey65")
     }
     metagene = metagene +
-                geom_col(aes(y=pos.mean, ymin=0), fill="#08306b", alpha=.90) +
-                geom_col(aes(y=neg.mean, ymax=0), fill="#2171b5", alpha=.90) +
-                theme_light() +
-                scale_x_continuous(breaks = c(-upstream/1000, 0, downstream/1000),
-                                   labels=c(upstream, refptlabel, downstream),
-                                   name=paste("distance from", refptlabel, "(nt)")) +
+                geom_col(aes(y=pos.mean), fill="#08306b", alpha=.90) +
+                geom_col(aes(y=neg.mean), fill="#2171b5", alpha=.90) +
+                theme_bw() +
                 scale_y_continuous(expand=c(0,0),
-                                   name=paste("mean", factors,
-                                              "coverage,\n over", nindices, ylabel)) +
-                theme(strip.text = element_text(size=12, face="bold"),
+                                   name="normalized counts") +
+                ggtitle(paste("mean", factors, "coverage"),
+                        subtitle = paste(nindices, ylabel)) +
+                theme(plot.title = element_text(size=12, face="bold"),
+                      plot.subtitle = element_text(size=12),
+                      strip.text = element_text(size=12, face="bold"),
                       strip.background = element_blank(),
-                      axis.text.x = element_text(size=10, face="bold", color="black"),
+                      axis.text.x = element_text(size=12, face="bold", color="black"),
                       axis.text.y = element_text(size=10, color="black"),
-                      axis.title.x = element_text(size=12, face="bold"),
-                      axis.title.y = element_text(size=10), 
+                      axis.title = element_text(size=12, face="bold"),
                       panel.grid.major.x=element_line(color="grey60"),
                       panel.grid.minor.x=element_line(color="grey80"),
                       panel.grid.major.y=element_line(color="grey80"),
                       panel.grid.minor.y=element_line(color="grey80"),
                       panel.spacing.x= unit(.5, "cm")) +
                 facet_grid(.~assay)
+    metagene = metagene %>% label_xaxis(upstream=upstream, downstream=downstream, refptlabel=refptlabel)
     ggsave(outpath, metagene, width=11, height=8, units="cm")
 }
 

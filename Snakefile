@@ -192,7 +192,7 @@ rule join_tfiib_window_counts:
     output:
         "correlations/union-bedgraph-window-{windowsize}-tfiibsamples.tsv.gz"
     shell: """
-        bedtools unionbedg -i {input.coverage} -header -names {params.names} | bash scripts/cleanUnionbedg.sh | pigz > {output}
+        bedtools unionbedg -i {input.coverage} -header -names {params.names} | bash scripts/cleanUnionbedg.sh | pigz -f > {output}
         """
 
 rule plotcorrelations:
