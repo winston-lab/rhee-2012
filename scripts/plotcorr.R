@@ -4,13 +4,16 @@ library(viridis)
 library(forcats)
 
 main = function(intable, binsize, pcount, samplelist, outpath){
-    df = intable %>% read_tsv() %>% gather(key=sample, value=signal, -name) %>%
-            filter(sample %in% samplelist)
-    df$sample = fct_inorder(df$sample, ordered=TRUE)
-    df = df %>% spread(sample, signal) %>% select(-name)
+    df = intable %>% read_tsv() %>%
+        gather(key=sample, value=signal, -name) %>%
+        filter(sample %in% samplelist) %>%
+        mutate_at(vars(sample), funs(fct_inorder(., ordered=TRUE))) %>%
+        spread(sample, signal) %>%
+        select(-name)
     
+    df = df[which(rowSums(df)>0),]
     maxsignal = max(df) + pcount
-    mincor = min(cor(df, use="complete.obs"))
+    mincor = min(cor(df, use="complete.obs")) * .99
     plots = list()
     
     #for each row
