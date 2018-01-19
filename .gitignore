@@ -3,6 +3,7 @@ annotations/
 alignment/
 qual_ctrl/
 coverage/
+peakcalling/
 csfasta/*
 logs/*
 logs/cluster/*

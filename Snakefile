@@ -18,8 +18,6 @@ rule all:
         expand("peakcalling/macs/{factor}_peaks.narrowPeak", factor=FACTORS),
         #FastQC
         # expand("qual_ctrl/fastqc/{sample}/{sample}_fastqc.html", sample=list(SAMPLES.keys())+["unknown"]),
-        # expand("csfasta/{sample}.csfasta.gz", sample=list(SAMPLES.keys())+["unknown"]),
-        # expand("alignment/{sample}.bam", sample=list(SAMPLES.keys())+["unknown"]),
         expand("coverage/{norm}/{sample}-chipexo-{norm}-{strand}.{fmt}", norm=["counts","libsizenorm"], strand=["plus", "minus", "SENSE", "ANTISENSE", "protection"], sample=EXO_SAMPLES, fmt=["bedgraph", "bw"]),
         expand("correlations/{factor}-nexus-v-exo-window-{windowsize}-correlations.svg", factor=INTERSECT_FACTORS, windowsize=config["corr-windowsizes"]),
         expand("datavis/{annotation}/libsizenorm/{factor}-{annotation}-libsizenorm-nexus-v-exo-{plottype}-bysample.svg", factor=INTERSECT_FACTORS, annotation=config["annotations"], plottype=["heatmap", "protection-metagene"])
@@ -223,7 +221,7 @@ rule make_stranded_genome:
 
 rule map_to_windows:
     input:
-        bg = lambda wildcards: NEXUS_SAMPLES[wildcards.sample]["coverage"] + ".bedgraph" if wildcards.sample in NEXUS_SAMPLES else "coverage/libsizenorm/" + wildcards.sample + "-chipexo-libsizenorm-SENSE.bedgraph",
+        bg = lambda wildcards: NEXUS_SAMPLES[wildcards.sample]["coverage"] + "SENSE.bedgraph" if wildcards.sample in NEXUS_SAMPLES else "coverage/libsizenorm/" + wildcards.sample + "-chipexo-libsizenorm-SENSE.bedgraph",
         chrsizes = os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
     output:
         exp = temp("coverage/{sample}-window-{windowsize}-coverage.bedgraph"),
@@ -233,7 +231,7 @@ rule map_to_windows:
 
 rule join_factor_window_counts:
     input:
-        coverage = lambda wildcards: expand("coverage/{sample}-window-{{windowsize}}-coverage.bedgraph", sample=[k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wildcards.factor] + [k for k,v in EXO_SAMPLES.items() if v["factor"]==wildcards.factor])
+        coverage = lambda wildcards: expand("coverage/{sample}-window-{windowsize}-coverage.bedgraph", sample=[k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wildcards.factor] + [k for k,v in EXO_SAMPLES.items() if v["factor"]==wildcards.factor], windowsize=wildcards.windowsize)
     params:
         names = lambda wildcards: ["ChIP-nexus-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]==wildcards.factor] + ["ChIP-exo-"+str(idx+1) for idx,v in enumerate(EXO_SAMPLES.items()) if v[1]["factor"]==wildcards.factor]
     output:
@@ -256,7 +254,7 @@ rule plotcorrelations:
 rule bedgraph_to_bigwig:
     input:
         bedgraph = "coverage/{norm}/{sample}-chipexo-{norm}-{strand}.bedgraph",
-        chrsizes = lambda wildcards: config["genome"]["chrsizes"] if wildcards.strand in ["plus","minus"] else os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
+        chrsizes = lambda wildcards: config["genome"]["chrsizes"] if wildcards.strand in ["plus","minus","protection"] else os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
     output:
         "coverage/{norm}/{sample}-chipexo-{norm}-{strand}.bw",
     log: "logs/bg_to_bw/bg_to_bw-{sample}-{norm}-{strand}.log"
@@ -277,7 +275,7 @@ rule make_stranded_annotations:
 rule compute_matrix:
     input:
         annotation = lambda wildcards: config["annotations"][wildcards.annotation]["path"] if wildcards.strand=="protection" else os.path.dirname(config["annotations"][wildcards.annotation]["path"]) + "/stranded/" + wildcards.annotation + "-STRANDED" + os.path.splitext(config["annotations"][wildcards.annotation]["path"])[1],
-        bw = lambda wildcards: "coverage/libsizenorm/" + wildcards.sample +"-chipexo-libsizenorm-"+ wildcards.strand + ".bw" if wildcards.sample in EXO_SAMPLES else NEXUS_SAMPLES[wildcards.sample]["coverage"] + ".bw"
+        bw = lambda wildcards: "coverage/libsizenorm/" + wildcards.sample +"-chipexo-libsizenorm-"+ wildcards.strand + ".bw" if wildcards.sample in EXO_SAMPLES else NEXUS_SAMPLES[wildcards.sample]["coverage"] + wildcards.strand + ".bw"
     output:
         dtfile = temp("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}.mat.gz"),
         matrix = temp("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}.tsv"),
