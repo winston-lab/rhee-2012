@@ -8,7 +8,7 @@ __default__:
     err : "logs/cluster/{rule}.{wildcards}.err"
 
 trim_and_demultiplex:
-    time: 120
+    time: 240
     mem : 8000
 
 fastqc:
@@ -34,15 +34,23 @@ get_coverage:
     time: 30
     mem: 2000 
 
+macs2:
+    time : 60
+    mem : 8000
+
+get_protection:
+    time : 10 
+    mem : 2000
+
 normalize:
-    time : 30
+    time : 5
     mem: 2000
 
 make_stranded_bedgraph:
     time : 15
     mem: 2000
 
-bg_to_bw:
+bedgraph_to_bigwig:
     time : 15
     mem: 2000
 
@@ -50,10 +58,24 @@ map_to_windows:
     time : 20
     mem: 4000
 
-join_tfiib_window_counts:
+join_factor_window_counts:
     time: 20
     mem: 4000
 
 plotcorrelations:
     time : 20
     mem: 10000
+
+compute_matrix:
+    time : 20
+    n : 1
+    mem : 2000
+
+plot_heatmaps:
+    time : 40 
+    mem : 16000
+
+plot_metagenes:
+    time : 60 
+    mem : 16000
+
