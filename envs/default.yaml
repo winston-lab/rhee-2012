@@ -1,0 +1,35 @@
+name: rhee12
+channels:
+    - bioconda
+    - conda-forge
+    - https://repo.anaconda.com/pkgs/free/linux-64
+    - https://repo.anaconda.com/pkgs/free/noarch
+    - https://repo.anaconda.com/pkgs/pro/linux-64
+    - https://repo.anaconda.com/pkgs/pro/noarch
+    - nodefaults
+
+dependencies:
+    - snakemake=5.2.0
+    - cutadapt=1.16
+    - perl=5.22.0.1
+    - pigz=2.3.4
+    - bedtools=2.27.1
+    - gawk=4.2.1
+    - sed=4.4
+    - deeptools=2.5.3
+    - ucsc-bedgraphtobigwig=332
+    - samtools=1.7
+    - pyfaidx=0.5.4.1
+    - r-tidyverse=1.1.1
+    - r-stringi=1.1.7
+    - r-svglite=1.2.1
+    - r-gdtools=0.1.6
+    - r-viridis=0.4.0
+    - r-ggally=1.3.2
+    - r-optparse=1.4.4
+    - r-argparse=1.0.4
+    - r-dendsort=0.3.3
+    - r-psych=1.7.3.21
+    - fastqc=0.11.7
+    - svg2png=4.1.1
+

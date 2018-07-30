@@ -29,12 +29,11 @@ rule make_barcode_fasta:
         with open(str(output), "w") as out:
             for x in config["exo_samples"][wildcards.run]["samples"]:
                 for k,v in x.items():
-                    out.write('>'+k+'\n^'+v["barcode"]+'\n')
+                    out.write(f'>{k}\n^{v["barcode"]}\n')
 
-
-#minimum length 5 sanitizes output for bowtie 
+#minimum length 5 sanitizes output for bowtie
 #output is uncompressed because I don't feel like learning how to open gzip files in perl right now...
-#we do it in series rather than parallel because there was no straightforward way to specify the outputs otherwise 
+#we do it in series rather than parallel because there was no straightforward way to specify the outputs otherwise
 #note that 'unknown' reads are overwritten by each demultiplexing, and are not looked at further
 rule trim_and_demultiplex:
     input:
@@ -51,7 +50,8 @@ rule trim_and_demultiplex:
             csfasta = CSFASTA[run]["csfasta"]
             qual = CSFASTA[run]["qual"]
             barcodes = "csfasta/" + run + ".fa"
-            shell("""cutadapt -c -g file:{barcodes} -q {params.trim_qual} -m 5 -o csfasta/{{name}}.csfastq --length-tag 'length=' {csfasta} {qual}; mv csfasta/unknown.csfastq csfasta/unknown-{run}.csfastq""")
+            shell("""cutadapt -c -g file:{barcodes} -q {params.trim_qual} -m 5 -o csfasta/{{name}}.csfastq --length-tag 'length=' {csfasta} {qual};
+                    mv csfasta/unknown.csfastq csfasta/unknown-{run}.csfastq""")
 
 # rule fastqc:
 #     input:
@@ -66,8 +66,9 @@ rule trim_and_demultiplex:
 #         (fastqc -o qual_ctrl/fastqc/{wildcards.sample} --noextract -t {threads} {input}) &>> {log}
 #         """
 
-# #cutadapt outputs in fastq format, but bowtie throws an error when I try to align using the fastq (either "Reads file contained a pattern with more than 1024 quality values" using bowtie 1.2.1.1, or "Too few quality values for read: SRR..." with bowtie 1.1.2) 
-# # so, convert back to csfasta/qual using a script I found on seqanswers by Nils Homer
+# cutadapt outputs in fastq format, but bowtie throws an error when I try to align using the fastq
+# (either "Reads file contained a pattern with more than 1024 quality values" using bowtie 1.2.1.1, or "Too few quality values for read: SRR..." with bowtie 1.1.2)
+# so, convert back to csfasta/qual using a script I found on seqanswers by Nils Homer
 rule csfastq_to_csfasta:
     input:
         "csfasta/{sample}.csfastq"
@@ -89,6 +90,7 @@ rule bowtie_build:
         idx_path = config["bowtie"]["index-path"],
         prefix = config["genome"]["name"]
     log: "logs/bowtie_build.log"
+    conda: "envs/bowtie.yaml"
     shell: """
         (bowtie-build --color {input.fasta} {params.idx_path}/{params.prefix}) &> {log}
         """
@@ -105,7 +107,7 @@ rule align:
     output:
         bam = "alignment/{sample}.bam",
         unaligned = temp("alignment/unaligned-{sample}.fastq")
-    # conda: "envs/bowtie.yaml"
+    conda: "envs/bowtie.yaml"
     threads: config["threads"]
     log:
         "logs/align/align-{sample}.log"
@@ -147,8 +149,8 @@ rule get_coverage:
 
 rule macs2:
     input:
-        bam = lambda wildcards: expand("alignment/{sample}.bam", sample={k for (k,v) in EXO_SAMPLES.items() if (v["factor"]==wildcards.factor)}),
-        chrsizes = config["genome"]["chrsizes"]
+        bam = lambda wc: expand("alignment/{sample}.bam", sample={k for (k,v) in EXO_SAMPLES.items() if (v["factor"]==wc.factor)}),
+        fasta = config["genome"]["fasta"]
     output:
         xls = "peakcalling/macs/{factor}_peaks.xls",
         peaks = "peakcalling/macs/{factor}_peaks.narrowPeak",
@@ -166,7 +168,7 @@ rule macs2:
         "envs/macs2.yaml"
     log: "logs/macs2/macs2-{factor}.log"
     shell: """
-        (macs2 callpeak -t {input.bam} -f BAM -g $(awk '{{sum += $2}} END {{print sum}}' {input.chrsizes}) --keep-dup all --bdg -n peakcalling/macs/{wildcards.factor} --SPMR --bw {params.bw} --slocal {params.slocal} --llocal {params.llocal} --call-summits -q {params.qscore}) &> {log}
+        (macs2 callpeak -t {input.bam} -f BAM -g $(faidx {input.fasta} -i chromsizes | awk '{{sum += $2}} END {{print sum}}') --keep-dup all --bdg -n peakcalling/macs/{wildcards.factor} --SPMR --bw {params.bw} --slocal {params.slocal} --llocal {params.llocal} --call-summits -q {params.qscore}) &> {log}
         (Rscript peakcalling/macs/{wildcards.factor}_model.r) &>> {log}
         (sed -i -e 's/peakcalling\/macs\///g' peakcalling/macs/{wildcards.factor}_peaks.narrowPeak) &>> {log}
         (sed -i -e 's/peakcalling\/macs\///g' peakcalling/macs/{wildcards.factor}_summits.bed) &>> {log}
@@ -174,7 +176,7 @@ rule macs2:
 
 rule get_protection:
     input:
-        tsv = lambda wildcards: "peakcalling/macs/" + EXO_SAMPLES[wildcards.sample]["factor"] + "_peaks.xls",
+        tsv = lambda wc: "peakcalling/macs/" + EXO_SAMPLES[wc.sample]["factor"] + "_peaks.xls",
         bam = "alignment/{sample}.bam"
     output:
         coverage = "coverage/counts/{sample}-chipexo-counts-protection.bedgraph"
@@ -209,31 +211,21 @@ rule make_stranded_bedgraph:
         (bash scripts/makeStrandedBedgraph.sh {input.minus} {input.plus} > {output.antisense}) &>> {log}
         """
 
-rule make_stranded_genome:
-    input:
-        exp = config["genome"]["chrsizes"],
-    output:
-        exp = os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
-    log: "logs/make_stranded_genome.log"
-    shell: """
-        (awk 'BEGIN{{FS=OFS="\t"}}{{print $1"-plus", $2}}{{print $1"-minus", $2}}' {input.exp} > {output.exp}) &> {log}
-        """
-
 rule map_to_windows:
     input:
-        bg = lambda wildcards: NEXUS_SAMPLES[wildcards.sample]["coverage"] + "SENSE.bedgraph" if wildcards.sample in NEXUS_SAMPLES else "coverage/libsizenorm/" + wildcards.sample + "-chipexo-libsizenorm-SENSE.bedgraph",
-        chrsizes = os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
+        bg = lambda wc: NEXUS_SAMPLES[wc.sample]["coverage"] + "SENSE.bedgraph" if wc.sample in NEXUS_SAMPLES else "coverage/libsizenorm/" + wc.sample + "-chipexo-libsizenorm-SENSE.bedgraph",
+        fasta = config["genome"]["fasta"]
     output:
         exp = temp("coverage/{sample}-window-{windowsize}-coverage.bedgraph"),
     shell: """
-        bedtools makewindows -g {input.chrsizes} -w {wildcards.windowsize} | LC_COLLATE=C sort -k1,1 -k2,2n | bedtools map -a stdin -b {input.bg} -c 4 -o sum > {output.exp}
+        bedtools makewindows -g <(faidx {input.fasta} -i chromsizes | awk 'BEGIN{{FS=OFS="\t"}}{{print $1"-plus", $2}}{{print $1"-minus", $2}}') -w {wildcards.windowsize} | LC_COLLATE=C sort -k1,1 -k2,2n | bedtools map -a stdin -b {input.bg} -c 4 -o sum > {output.exp}
         """
 
 rule join_factor_window_counts:
     input:
-        coverage = lambda wildcards: expand("coverage/{sample}-window-{windowsize}-coverage.bedgraph", sample=[k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wildcards.factor] + [k for k,v in EXO_SAMPLES.items() if v["factor"]==wildcards.factor], windowsize=wildcards.windowsize)
+        coverage = lambda wc: expand("coverage/{sample}-window-{windowsize}-coverage.bedgraph", sample=[k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wc.factor] + [k for k,v in EXO_SAMPLES.items() if v["factor"]==wc.factor], windowsize=wc.windowsize)
     params:
-        names = lambda wildcards: ["ChIP-nexus-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]==wildcards.factor] + ["ChIP-exo-"+str(idx+1) for idx,v in enumerate(EXO_SAMPLES.items()) if v[1]["factor"]==wildcards.factor]
+        names = lambda wc: ["ChIP-nexus-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]==wc.factor] + ["ChIP-exo-"+str(idx+1) for idx,v in enumerate(EXO_SAMPLES.items()) if v[1]["factor"]==wc.factor]
     output:
         "correlations/union-bedgraph-{factor}-window-{windowsize}.tsv.gz"
     shell: """
@@ -246,25 +238,27 @@ rule plotcorrelations:
     output:
         "correlations/{factor}-nexus-v-exo-window-{windowsize}-correlations.svg"
     params:
-        pcount = lambda wildcards: 0.1*int(wildcards.windowsize),
-        samplelist = lambda wildcards: ["ChIP-nexus-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]==wildcards.factor] + ["ChIP-exo-"+str(idx+1) for idx,v in enumerate(EXO_SAMPLES.items()) if v[1]["factor"]==wildcards.factor]
+        pcount = lambda wc: 0.01*int(wc.windowsize),
+        samplelist = lambda wc: ["ChIP-nexus-"+str(idx+1) for idx,v in enumerate(NEXUS_SAMPLES.items()) if v[1]["factor"]==wc.factor] + ["ChIP-exo-"+str(idx+1) for idx,v in enumerate(EXO_SAMPLES.items()) if v[1]["factor"]==wc.factor]
     script:
         "scripts/plotcorr.R"
 
 rule bedgraph_to_bigwig:
     input:
         bedgraph = "coverage/{norm}/{sample}-chipexo-{norm}-{strand}.bedgraph",
-        chrsizes = lambda wildcards: config["genome"]["chrsizes"] if wildcards.strand in ["plus","minus","protection"] else os.path.splitext(config["genome"]["chrsizes"])[0] + "-STRANDED.tsv",
+        fasta: config["genome"]["fasta"]
     output:
         "coverage/{norm}/{sample}-chipexo-{norm}-{strand}.bw",
+    params:
+        stranded = lambda wc: [] if wc.strand not in ["SENSE", "ANTISENSE"] else """| awk 'BEGIN{{FS=OFS="\t"}}{{print $1"-plus", $2; print $1"-minus", $2}}' | LC_COLLATE=C sort -k1,1"""
     log: "logs/bg_to_bw/bg_to_bw-{sample}-{norm}-{strand}.log"
     shell: """
-        (bedGraphToBigWig {input.bedgraph} {input.chrsizes} {output}) &> {log}
+        (bedGraphToBigWig {input.bedgraph} <(faidx {input.fasta} -i chromsizes {params.stranded}) {output}) &> {log}
         """
 
 rule make_stranded_annotations:
     input:
-        lambda wildcards : config["annotations"][wildcards.annotation]["path"]
+        lambda wc : config["annotations"][wc.annotation]["path"]
     output:
         "{annopath}/stranded/{annotation}-STRANDED.{ext}"
     log : "logs/make_stranded_annotations/make_stranded_annotations-{annotation}.log"
@@ -274,20 +268,20 @@ rule make_stranded_annotations:
 
 rule compute_matrix:
     input:
-        annotation = lambda wildcards: config["annotations"][wildcards.annotation]["path"] if wildcards.strand=="protection" else os.path.dirname(config["annotations"][wildcards.annotation]["path"]) + "/stranded/" + wildcards.annotation + "-STRANDED" + os.path.splitext(config["annotations"][wildcards.annotation]["path"])[1],
-        bw = lambda wildcards: "coverage/libsizenorm/" + wildcards.sample +"-chipexo-libsizenorm-"+ wildcards.strand + ".bw" if wildcards.sample in EXO_SAMPLES else NEXUS_SAMPLES[wildcards.sample]["coverage"] + wildcards.strand + ".bw"
+        annotation = lambda wc: config["annotations"][wc.annotation]["path"] if wc.strand=="protection" else os.path.dirname(config["annotations"][wc.annotation]["path"]) + "/stranded/" + wc.annotation + "-STRANDED" + os.path.splitext(config["annotations"][wc.annotation]["path"])[1],
+        bw = lambda wc: "coverage/libsizenorm/" + wc.sample +"-chipexo-libsizenorm-"+ wc.strand + ".bw" if wc.sample in EXO_SAMPLES else NEXUS_SAMPLES[wc.sample]["coverage"] + wc.strand + ".bw"
     output:
         dtfile = temp("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}.mat.gz"),
         matrix = temp("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}.tsv"),
         melted = "datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}-melted.tsv.gz",
     params:
-        group = lambda wildcards : "ChIP-exo" if wildcards.sample in EXO_SAMPLES else "ChIP-nexus",
-        upstream = lambda wildcards: config["annotations"][wildcards.annotation]["upstream"] + config["annotations"][wildcards.annotation]["binsize"],
-        dnstream = lambda wildcards: config["annotations"][wildcards.annotation]["dnstream"] + config["annotations"][wildcards.annotation]["binsize"],
-        binsize = lambda wildcards: config["annotations"][wildcards.annotation]["binsize"],
-        sort = lambda wildcards: config["annotations"][wildcards.annotation]["sort"],
-        sortusing = lambda wildcards: config["annotations"][wildcards.annotation]["sortby"],
-        binstat = lambda wildcards: config["annotations"][wildcards.annotation]["binstat"]
+        group = lambda wc : "ChIP-exo" if wc.sample in EXO_SAMPLES else "ChIP-nexus",
+        upstream = lambda wc: config["annotations"][wc.annotation]["upstream"] + config["annotations"][wc.annotation]["binsize"],
+        dnstream = lambda wc: config["annotations"][wc.annotation]["dnstream"] + config["annotations"][wc.annotation]["binsize"],
+        binsize = lambda wc: config["annotations"][wc.annotation]["binsize"],
+        sort = lambda wc: config["annotations"][wc.annotation]["sort"],
+        sortusing = lambda wc: config["annotations"][wc.annotation]["sortby"],
+        binstat = lambda wc: config["annotations"][wc.annotation]["binstat"]
     threads : config["threads"]
     log: "logs/compute_matrix/compute_matrix-{annotation}_{sample}_{factor}-libsizenorm-{strand}.log"
     run:
@@ -306,7 +300,7 @@ rule compute_matrix:
 
 rule cat_matrices:
     input:
-        lambda wildcards: expand("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}-melted.tsv.gz", sample=[k for k,v in EXO_SAMPLES.items() if v["factor"]==wildcards.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wildcards.factor], annotation=wildcards.annotation, factor=wildcards.factor, strand=wildcards.strand)
+        lambda wc: expand("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}-melted.tsv.gz", sample=[k for k,v in EXO_SAMPLES.items() if v["factor"]==wc.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wc.factor], annotation=wc.annotation, factor=wc.factor, strand=wc.strand)
     output:
         "datavis/{annotation}/libsizenorm/allsamples-{annotation}-{factor}-libsizenorm-{strand}.tsv.gz"
     log: "logs/cat_matrices/cat_matrices-{annotation}_libsizenorm-{strand}.log"
@@ -321,16 +315,16 @@ rule plot_heatmaps:
         heatmap_sample = "datavis/{annotation}/libsizenorm/{factor}-{annotation}-libsizenorm-nexus-v-exo-heatmap-bysample.svg",
         heatmap_group = "datavis/{annotation}/libsizenorm/{factor}-{annotation}-libsizenorm-nexus-v-exo-heatmap-bygroup.svg",
     params:
-        samplelist = lambda wildcards: [k for k,v in EXO_SAMPLES.items() if v["factor"]==wildcards.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wildcards.factor],
-        mtype = lambda wildcards : config["annotations"][wildcards.annotation]["type"],
-        upstream = lambda wildcards : config["annotations"][wildcards.annotation]["upstream"],
-        dnstream = lambda wildcards : config["annotations"][wildcards.annotation]["dnstream"],
-        pct_cutoff = lambda wildcards : config["annotations"][wildcards.annotation]["pct_cutoff"],
-        cluster = lambda wildcards : config["annotations"][wildcards.annotation]["cluster"],
-        nclust = lambda wildcards: config["annotations"][wildcards.annotation]["nclusters"],
-        heatmap_cmap = lambda wildcards : config["annotations"][wildcards.annotation]["heatmap_colormap"],
-        refpointlabel = lambda wildcards : config["annotations"][wildcards.annotation]["refpointlabel"],
-        ylabel = lambda wildcards : config["annotations"][wildcards.annotation]["ylabel"]
+        samplelist = lambda wc: [k for k,v in EXO_SAMPLES.items() if v["factor"]==wc.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wc.factor],
+        mtype = lambda wc : config["annotations"][wc.annotation]["type"],
+        upstream = lambda wc : config["annotations"][wc.annotation]["upstream"],
+        dnstream = lambda wc : config["annotations"][wc.annotation]["dnstream"],
+        pct_cutoff = lambda wc : config["annotations"][wc.annotation]["pct_cutoff"],
+        cluster = lambda wc : config["annotations"][wc.annotation]["cluster"],
+        nclust = lambda wc: config["annotations"][wc.annotation]["nclusters"],
+        heatmap_cmap = lambda wc : config["annotations"][wc.annotation]["heatmap_colormap"],
+        refpointlabel = lambda wc : config["annotations"][wc.annotation]["refpointlabel"],
+        ylabel = lambda wc : config["annotations"][wc.annotation]["ylabel"]
     run:
         if config["annotations"][wildcards.annotation]["type"]=="scaled":
             scaled_length = config["annotations"][wildcards.annotation]["scaled_length"]
@@ -356,13 +350,13 @@ rule plot_metagenes:
         meta_heatmap_group = "datavis/{annotation}/libsizenorm/{factor}-{annotation}-libsizenorm-nexus-v-exo-protection-metaheatmap-bygroup.svg",
         meta_heatmap_sample = "datavis/{annotation}/libsizenorm/{factor}-{annotation}-libsizenorm-nexus-v-exo-protection-metaheatmap-bysample.svg",
     params:
-        samplelist = lambda wildcards: [k for k,v in EXO_SAMPLES.items() if v["factor"]==wildcards.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wildcards.factor],
-        mtype = lambda wildcards : config["annotations"][wildcards.annotation]["type"],
-        upstream = lambda wildcards : config["annotations"][wildcards.annotation]["upstream"],
-        dnstream = lambda wildcards : config["annotations"][wildcards.annotation]["dnstream"],
-        trim_pct = lambda wildcards : config["annotations"][wildcards.annotation]["trim_pct"],
-        refpointlabel = lambda wildcards : config["annotations"][wildcards.annotation]["refpointlabel"],
-        ylabel = lambda wildcards : config["annotations"][wildcards.annotation]["ylabel"]
+        samplelist = lambda wc: [k for k,v in EXO_SAMPLES.items() if v["factor"]==wc.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wc.factor],
+        mtype = lambda wc : config["annotations"][wc.annotation]["type"],
+        upstream = lambda wc : config["annotations"][wc.annotation]["upstream"],
+        dnstream = lambda wc : config["annotations"][wc.annotation]["dnstream"],
+        trim_pct = lambda wc : config["annotations"][wc.annotation]["trim_pct"],
+        refpointlabel = lambda wc : config["annotations"][wc.annotation]["refpointlabel"],
+        ylabel = lambda wc : config["annotations"][wc.annotation]["ylabel"]
     run:
         if config["annotations"][wildcards.annotation]["type"]=="scaled":
             scaled_length = config["annotations"][wildcards.annotation]["scaled_length"]
@@ -371,3 +365,4 @@ rule plot_metagenes:
             scaled_length=0
             endlabel = "HAIL SATAN!"
         shell("""Rscript scripts/plot_nexus_metagenes.R --inplus {input.plus} --inminus {input.minus} --inprotection {input.protection} -s {params.samplelist} -t {params.mtype} -u {params.upstream} -d {params.dnstream} -p {params.trim_pct} -r {params.refpointlabel} -f {wildcards.factor} -l {scaled_length} -e {endlabel} -y {params.ylabel} --out1 {output.smeta_group} --out2 {output.smeta_sample} --out3 {output.pmeta_group} --out4 {output.pmeta_sample} --out5 {output.pmeta_goverlay} --out6 {output.pmeta_soverlay} --out7 {output.pmeta_soverlay_bygroup} --out8 {output.meta_heatmap_group} --out9 {output.meta_heatmap_sample}""")
+

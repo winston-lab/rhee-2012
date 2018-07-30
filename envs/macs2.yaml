@@ -1,8 +1,9 @@
-name: macs2 
+name: macs2
 channels:
     - bioconda
-    - r
+    - conda-forge
 dependencies:
-    - macs2=2.1.1.20160309 
-    - r
+    - macs2=2.1.1.20160309
+    - r=3.4.1
+    - pyfaidx=0.5.4.1
 

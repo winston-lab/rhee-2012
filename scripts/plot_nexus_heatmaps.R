@@ -28,8 +28,8 @@ args = parser$parse_args()
 format_xaxis = function(refptlabel, upstream, dnstream){
     function(x){
         if (first(upstream)>500 | first(dnstream)>500){
-            return(if_else(x==0, refptlabel, as.character(x)))    
-        }    
+            return(if_else(x==0, refptlabel, as.character(x)))
+        }
         else {
             return(if_else(x==0, refptlabel, as.character(x*1000)))
         }
@@ -78,15 +78,15 @@ main = function(intable, samplelist, type, upstream, dnstream, pct_cutoff,
                                    labels=c(refptlabel, "", endlabel),
                                    name="scaled distance",
                                    expand=c(0.05,0))
-            
+
         }
         return(heatmap_base)
     }
-    
+
     raw = read_tsv(intable, col_names=c("group", "sample", "index", "position","cpm")) %>%
-        filter(sample %in% samplelist & !is.na(cpm)) %>% 
+        filter(sample %in% samplelist & !is.na(cpm)) %>%
         mutate_at(vars(sample, group), funs(fct_inorder(., ordered=TRUE)))
-        
+
     nindices = max(raw$index, na.rm=TRUE)
     nsamples = length(samplelist)
     ngroups = length(fct_unique(raw$group))
@@ -97,11 +97,11 @@ main = function(intable, samplelist, type, upstream, dnstream, pct_cutoff,
         rr = raw %>% select(-group) %>% unite(cid, c(sample, position), sep="~") %>%
                 spread(cid, cpm, fill=0) %>% select(-index)
         clust = kmeans(rr, centers=k)
-       
+
         #then hierarchical clustering on the k-means centers and sorting
         #of the resulting dendrogram
         centerclust = clust$centers %>% dist() %>% hclust() %>% dendsort(isReverse=TRUE)
-        
+
         reorder = clust$cluster %>% as_tibble() %>% rename(cluster=value) %>%
             mutate(cluster = factor(cluster, levels=centerclust$order, ordered=TRUE),
                    og_index=row_number()) %>%
@@ -109,32 +109,32 @@ main = function(intable, samplelist, type, upstream, dnstream, pct_cutoff,
             mutate(new_index=row_number())
         raw = raw %>% left_join(reorder, by=c("index"="og_index")) %>%
             select(-index) %>% rename(index=new_index)
-    } 
-    
+    }
+
     #get replicate info for sample facetting
     repl_df = raw %>% select(group, sample) %>% distinct() %>% group_by(group) %>%
         mutate(replicate=row_number()) %>% ungroup() %>% select(-group)
-    
+
     #plot heatmap facetted by sample and group
     df_sample = raw %>% left_join(repl_df, by="sample")
     sample_cutoff = quantile(df_sample$cpm, probs=pct_cutoff, na.rm=TRUE)
     df_sample = df_sample %>%
         mutate(cpm = pmin(sample_cutoff, cpm))
-    
+
     hmap_sample = hmap(df=df_sample, refptlabel=refptlabel, scaled_length=scaled_length,
                        endlabel=endlabel) +
         facet_grid(replicate~group) +
         theme(strip.text.y=element_text(angle=0))
- 
-    hmap.width = max(12, (.0008*(upstream+scaled_length+dnstream)+3.4)*ngroups) 
+
+    hmap.width = max(12, (.0008*(upstream+scaled_length+dnstream)+3.4)*ngroups)
     ggsave(samples_out, plot=hmap_sample, height=(.0005*nindices+7.5)*max(repl_df$replicate),
            width=hmap.width, units="cm", limitsize=FALSE)
     rm(hmap_sample, df_sample, repl_df)
-    
+
     df_group = raw %>% group_by(group, index, position) %>% summarise(cpm = mean(cpm))
     rm(raw)
     group_cutoff = quantile(df_group$cpm, probs=pct_cutoff, na.rm=TRUE)
-    df_group = df_group %>% 
+    df_group = df_group %>%
         mutate(cpm = pmin(group_cutoff, cpm))
 
     hmap_group = hmap(df=df_group, refptlabel=refptlabel, scaled_length=scaled_length,
