@@ -9,7 +9,7 @@ FACTORS = set(v["factor"] for (k,v) in EXO_SAMPLES.items())
 INTERSECT_FACTORS = [x for x in FACTORS if x in set(v["factor"] for k,v in NEXUS_SAMPLES.items())]
 
 localrules: all,
-    make_barcode_fasta, make_stranded_genome, cat_matrices
+    make_barcode_fasta, cat_matrices
 
 rule all:
     input:
@@ -246,7 +246,7 @@ rule plotcorrelations:
 rule bedgraph_to_bigwig:
     input:
         bedgraph = "coverage/{norm}/{sample}-chipexo-{norm}-{strand}.bedgraph",
-        fasta: config["genome"]["fasta"]
+        fasta= config["genome"]["fasta"]
     output:
         "coverage/{norm}/{sample}-chipexo-{norm}-{strand}.bw",
     params:
@@ -260,15 +260,15 @@ rule make_stranded_annotations:
     input:
         lambda wc : config["annotations"][wc.annotation]["path"]
     output:
-        "{annopath}/stranded/{annotation}-STRANDED.{ext}"
+        "datavis/{annotation}/{annotation}.bed"
     log : "logs/make_stranded_annotations/make_stranded_annotations-{annotation}.log"
     shell: """
-        (bash scripts/makeStrandedBed.sh {input} > {output}) &> {log}
+        (cut -f1-6 {input} | bash scripts/makeStrandedBed.sh > {output}) &> {log}
         """
 
 rule compute_matrix:
     input:
-        annotation = lambda wc: config["annotations"][wc.annotation]["path"] if wc.strand=="protection" else os.path.dirname(config["annotations"][wc.annotation]["path"]) + "/stranded/" + wc.annotation + "-STRANDED" + os.path.splitext(config["annotations"][wc.annotation]["path"])[1],
+        annotation = lambda wc: config["annotations"][wc.annotation]["path"] if wc.strand=="protection" else "datavis/{annotation}/{annotation}.bed".format(**wc),
         bw = lambda wc: "coverage/libsizenorm/" + wc.sample +"-chipexo-libsizenorm-"+ wc.strand + ".bw" if wc.sample in EXO_SAMPLES else NEXUS_SAMPLES[wc.sample]["coverage"] + wc.strand + ".bw"
     output:
         dtfile = temp("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}.mat.gz"),
@@ -303,7 +303,7 @@ rule cat_matrices:
         lambda wc: expand("datavis/{annotation}/libsizenorm/{annotation}_{sample}_{factor}-libsizenorm-{strand}-melted.tsv.gz", sample=[k for k,v in EXO_SAMPLES.items() if v["factor"]==wc.factor] + [k for k,v in NEXUS_SAMPLES.items() if v["factor"]==wc.factor], annotation=wc.annotation, factor=wc.factor, strand=wc.strand)
     output:
         "datavis/{annotation}/libsizenorm/allsamples-{annotation}-{factor}-libsizenorm-{strand}.tsv.gz"
-    log: "logs/cat_matrices/cat_matrices-{annotation}_libsizenorm-{strand}.log"
+    log: "logs/cat_matrices/cat_matrices-{annotation}_{factor}-libsizenorm-{strand}.log"
     shell: """
         (cat {input} > {output}) &> {log}
         """

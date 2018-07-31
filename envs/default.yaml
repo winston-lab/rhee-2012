@@ -30,6 +30,7 @@ dependencies:
     - r-argparse=1.0.4
     - r-dendsort=0.3.3
     - r-psych=1.7.3.21
+    - r-ggthemes=3.4.0
     - fastqc=0.11.7
     - svg2png=4.1.1
 
