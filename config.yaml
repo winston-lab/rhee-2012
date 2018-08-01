@@ -54,7 +54,7 @@ cutadapt:
 threads: 4
 
 bowtie:
-    index-path: ../../genome/bowtie1_indexes
+    index-path: ../../genomefiles_cerevisiae/bowtie1_indexes
     max_mismatch: 2
 
 macs2:
@@ -73,7 +73,7 @@ corr-windowsizes:
 annotations:
     rhee2012_cleanedTATAs:
         type: absolute
-        path : ../../genome/annotations/rhee2012_cleaned.bed
+        path : ../../genomefiles_cerevisiae/annotations/rhee2012-TATAboxes-cleaned.bed
         binsize : 1
         binstat : mean # OPTIONS: mean, median, min, max, sum, std
         refpoint : TSS # OPTIONS: TSS, TES , center
@@ -91,7 +91,7 @@ annotations:
         ylabel : TATA boxes      # y-axis label (for regions represented in the BED file)
     verified-transcripts-scaled:
         type: scaled
-        path : ../../genome/annotations/Scer_transcripts_w_verifiedORFs.bed
+        path : ../../genomefiles_cerevisiae/annotations/Scer_transcripts_w_verifiedORFs.bed
         binsize : 20
         binstat : mean # OPTIONS: mean, median, min, max, sum, std
         scaled_length: 2000
