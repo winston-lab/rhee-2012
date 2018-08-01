@@ -1,0 +1,110 @@
+genome:
+    name : Sc_colorspace
+    fasta : ../../genomefiles_cerevisiae/S_cerevisiae.R64-2-1.fa
+
+exo_samples:
+    run1:
+        csfasta: csfasta/SRR396797_F3.csfasta.gz
+        qual: csfasta/SRR396797_F3_QV.qual.gz
+        samples:
+            - tfiib-exo:
+                barcode: GATC
+                factor: TFIIB
+            - ssl2-exo:
+                barcode: CAAT
+                factor: Ssl2
+    run2:
+        csfasta: csfasta/SRR396798_F3.csfasta.gz
+        qual: csfasta/SRR396798_F3_QV.qual.gz
+        samples:
+            - tbp-exo-1:
+                barcode: TAGC
+                factor: TBP
+            - tbp-exo-2:
+                barcode: GCCT
+                factor: TBP
+    run3:
+        csfasta: csfasta/SRR396815_F3.csfasta.gz
+        qual: csfasta/SRR396815_F3_QV.qual.gz
+        samples:
+            - polii-exo:
+                barcode: TCCC
+                factor: Rpb1
+            # - tfb1-exo:
+            #     barcode: AGCG
+            #     factor: Tfb1
+
+nexus_samples:
+    tfiib-nexus-1:
+        coverage: ../../chipnexus-tfiib-publication/coverage/libsizenorm/WT-37C-1_tfiib-chipnexus-libsizenorm-
+        factor: TFIIB
+    tfiib-nexus-2:
+        coverage: ../../chipnexus-tfiib-publication/coverage/libsizenorm/WT-37C-2_tfiib-chipnexus-libsizenorm-
+        factor: TFIIB
+    polii-nexus-1:
+        coverage: ../../chipnexus-spt6-v-rnapii/coverage/libsizenorm/YPD-RNAPII-1_factor-chipnexus-libsizenorm-
+        factor: Rpb1
+    polii-nexus-2:
+        coverage: ../../chipnexus-spt6-v-rnapii/coverage/libsizenorm/YPD-RNAPII-2_factor-chipnexus-libsizenorm-
+        factor: Rpb1
+
+cutadapt:
+    trim_qual: 16
+
+threads: 4
+
+bowtie:
+    index-path: ../../genome/bowtie1_indexes
+    max_mismatch: 2
+
+macs2:
+    bw: 160 #bandwidth for model building: set as sonication fragment size
+    slocal: 200 #small region for calculating local lambda
+    llocal: 1000 #large region for calculating local lambda
+    fdr: 0.01 #minimum cutoff to call significant regions
+
+corr-windowsizes:
+    - 10
+    - 25
+    - 50
+    - 100
+    - 200
+
+annotations:
+    rhee2012_cleanedTATAs:
+        type: absolute
+        path : ../../genome/annotations/rhee2012_cleaned.bed
+        binsize : 1
+        binstat : mean # OPTIONS: mean, median, min, max, sum, std
+        refpoint : TSS # OPTIONS: TSS, TES , center
+        upstream : 30
+        dnstream : 120
+        sort : keep # OPTIONS: descend, ascend, no, keep
+        sortby : region_length
+        pct_cutoff : .97 # do not plot data above this percentile in heatmaps
+        cluster: no
+        nclusters: 0
+        trim_pct : 0.1 #percent to ignore on either end for trimmed mean
+        nan_afterend: n
+        heatmap_colormap : inferno  # OPTIONS: viridis, inferno, magma, plasma
+        refpointlabel : TATA # label for reference point
+        ylabel : TATA boxes      # y-axis label (for regions represented in the BED file)
+    verified-transcripts-scaled:
+        type: scaled
+        path : ../../genome/annotations/Scer_transcripts_w_verifiedORFs.bed
+        binsize : 20
+        binstat : mean # OPTIONS: mean, median, min, max, sum, std
+        scaled_length: 2000
+        upstream : 500
+        dnstream : 500
+        sort : ascend # OPTIONS: descend, ascend, no, keep
+        sortby : region_length
+        pct_cutoff : .90 # do not plot data above this percentile in heatmaps
+        trim_pct: 0.1
+        cluster: no
+        nclusters: 0
+        heatmap_colormap : inferno  # OPTIONS: viridis, inferno, magma, plasma
+        refpointlabel : TSS # label for reference point
+        three_prime_label: CPS
+        ylabel : coding genes      # y-axis label (for regions represented in the BED file)
+

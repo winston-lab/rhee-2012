@@ -18,8 +18,6 @@ Rplots.pdf
 mogrify.err
 mogrify.log
 
-config.yaml
-
 !fastq/.gitkeep
 !logs/.gitkeep
 !logs/cluster/
