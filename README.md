@@ -3,7 +3,7 @@
 
 ## description
 
-Code used to align ChIP-exo data from [Rhee and Pugh, 2012](https://doi.org/10.1038/nature10799) and compare it to ChIP-nexus data from [our preprint](https://doi.org/10.1101/347575). To reproduce the results from our paper, use the archived version of this analysis from [Zenodo](https://doi.org/10.5281/zenodo.1325930).
+Code used to align ChIP-exo data from [Rhee and Pugh, 2012](https://doi.org/10.1038/nature10799) and compare it to ChIP-nexus data from our [2018 Spt6 publication](https://doi.org/10.1016/j.molcel.2018.09.005). To reproduce the results from our paper, use the archived version of this analysis from [Zenodo](https://doi.org/10.5281/zenodo.1409826).
 
 ## requirements
 
